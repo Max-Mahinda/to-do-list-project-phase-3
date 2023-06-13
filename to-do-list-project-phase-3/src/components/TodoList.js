@@ -4,6 +4,7 @@ function TodoList() {
   const [todos, setTodos] = useState([]);
   const [name, setName] = useState('');
   const [todo, setTodo] = useState('');
+  const [editingId, setEditingId] = useState(null);
   const [user, setUser] = useState(null);
 
   const fetchTodos = async () => {
@@ -20,7 +21,7 @@ function TodoList() {
 
   const fetchUser = async () => {
     try {
-      const response = await fetch('http://localhost:9292//users/:id');
+      const response = await fetch('http://localhost:9292/users/:id');
       if (response.ok) {
         const data = await response.json();
         setUser(data);
@@ -40,23 +41,54 @@ function TodoList() {
 
   const handleAddTodo = async () => {
     if (name.trim() !== '' && todo.trim() !== '') {
-      const newTodo = { name, todo };
-      try {
-        const response = await fetch('http://localhost:9292/todos', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(newTodo),
-        });
-        if (response.ok) {
-          fetchTodos();
-          setName('');
-          setTodo('');
+      if (editingId) {
+        // Editing existing task
+        try {
+          const response = await fetch(`http://localhost:9292/todos/${editingId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name, todo }),
+          });
+          if (response.ok) {
+            fetchTodos();
+            setName('');
+            setTodo('');
+            setEditingId(null);
+          }
+        } catch (error) {
+          console.error('Error editing todo:', error);
         }
-      } catch (error) {
-        console.error('Error adding todo:', error);
+      } else {
+        // Adding new task
+        const newTodo = { name, todo };
+        try {
+          const response = await fetch('http://localhost:9292/todos', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(newTodo),
+          });
+          if (response.ok) {
+            fetchTodos();
+            setName('');
+            setTodo('');
+          }
+        } catch (error) {
+          console.error('Error adding todo:', error);
+        }
       }
+    }
+  };
+
+  const handleEditTodo = (todoId) => {
+    const todoToEdit = todos.find((todo) => todo.id === todoId);
+    if (todoToEdit) {
+      setName(todoToEdit.name);
+      setTodo(todoToEdit.todo);
+      setEditingId(todoId);
     }
   };
 
@@ -67,6 +99,11 @@ function TodoList() {
       });
       if (response.ok) {
         fetchTodos();
+        if (editingId === todoId) {
+          setName('');
+          setTodo('');
+          setEditingId(null);
+        }
       }
     } catch (error) {
       console.error('Error deleting todo:', error);
@@ -75,7 +112,7 @@ function TodoList() {
 
   useEffect(() => {
     fetchTodos();
-    fetchUser(); // Fetch the user information when the component mounts
+    fetchUser();
   }, []);
 
   return (
@@ -107,13 +144,14 @@ function TodoList() {
           placeholder="Enter a task"
         />
       </div>
-      <button onClick={handleAddTodo}>Add</button>
+      <button onClick={handleAddTodo}>{editingId ? 'Edit' : 'Add'}</button>
       <ul>
         {todos.map((todo) => (
           <li key={todo.id}>
             <div>
               <strong>{todo.name}:</strong> {todo.todo}
             </div>
+            <button onClick={() => handleEditTodo(todo.id)}>Edit</button>
             <button onClick={() => handleDeleteTodo(todo.id)}>Delete</button>
           </li>
         ))}
